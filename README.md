@@ -1,6 +1,6 @@
 # SupplyGraph
 
-SupplyGraph is a backend project for scanning software assets, normalizing package inventory, and eventually exposing dependency, vulnerability, and risk analysis through structured APIs and MCP tools.
+SupplyGraph is a backend project for scanning software assets, normalizing package inventory, enriching package versions with vulnerability data, and eventually exposing dependency, vulnerability, and risk analysis through structured APIs and MCP tools.
 
 ## Current Status
 
@@ -9,15 +9,18 @@ The project currently supports:
 - parsing Syft JSON output from a saved file
 - filtering and normalizing package-like artifacts
 - persisting assets and scans into PostgreSQL
-- defining the first database schema for assets, scans, components, and component versions
+- persisting normalized components, component versions, and scan membership
+- enriching npm package versions with OSV vulnerability data
+- persisting vulnerabilities and findings into PostgreSQL
 
 The project does not yet support:
 
-- component and component version persistence during ingestion
 - dependency graph persistence
-- vulnerability enrichment with OSV or Trivy
+- Trivy enrichment
 - GraphQL APIs
 - MCP tools
+- scheduled or background scan processing
+- test coverage
 
 ## Tech Stack
 
@@ -25,6 +28,7 @@ The project does not yet support:
 - PostgreSQL
 - Docker Compose
 - Syft
+- OSV
 
 ## Local Development
 
@@ -34,21 +38,28 @@ The project does not yet support:
 docker compose up -d
 ```
 
-### Apply the initial schema
+### Apply database migrations
 
 ```bash
 docker exec -i supplygraph-postgres psql -U supplygraph -d supplygraph < migrations/001_init.sql
+docker exec -i supplygraph-postgres psql -U supplygraph -d supplygraph < migrations/002_vulnerabilities.sql
 ```
 
 ### Set the database connection string
 
-If your Docker PostgreSQL instance is exposed on port `5433`:
+If your Docker PostgreSQL instance is exposed on port `5432`:
 
 ```bash
-export DATABASE_URL="postgres://supplygraph:supplygraph@localhost:5433/supplygraph?sslmode=disable"
+export DATABASE_URL="postgres://supplygraph:supplygraph@localhost:5432/supplygraph?sslmode=disable"
 ```
 
-If it is exposed on port `5432`, update the port in the URL accordingly.
+If you remap the container to a different host port, update the URL accordingly.
+
+### Generate a Syft JSON scan
+
+```bash
+syft /path/to/asset -o json > deps.json
+```
 
 ### Run ingestion against a saved Syft JSON file
 
@@ -62,12 +73,43 @@ Example:
 go run ./cmd/ingest /Users/arushsacheti/Downloads/argo-cd-master/deps.json /Users/arushsacheti/Downloads/argo-cd-master
 ```
 
+### Inspect stored data
+
+```bash
+docker exec -it supplygraph-postgres psql -U supplygraph -d supplygraph
+```
+
+Example queries:
+
+```sql
+SELECT * FROM assets;
+SELECT COUNT(*) FROM scans;
+SELECT COUNT(*) FROM components;
+SELECT COUNT(*) FROM component_versions;
+SELECT COUNT(*) FROM vulnerabilities;
+SELECT COUNT(*) FROM findings;
+```
+
+## Current Data Model
+
+Implemented tables:
+
+- `assets`
+- `scans`
+- `components`
+- `component_versions`
+- `scan_component_versions`
+- `vulnerabilities`
+- `findings`
+
 ## Project Layout
 
 ```text
-cmd/ingest/          CLI entrypoint for first ingestion workflow
+cmd/ingest/          CLI entrypoint for ingestion workflow
+internal/ingest/     Inventory persistence and OSV enrichment workflows
 internal/db/         PostgreSQL connection and persistence helpers
 internal/model/      Normalized application/domain models
+internal/osv/        OSV client and response types
 internal/syft/       Syft JSON parsing and normalization logic
 migrations/          Database schema SQL
 docker-compose.yml   Local PostgreSQL development environment
