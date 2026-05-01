@@ -15,12 +15,12 @@ The project currently supports:
 - enriching npm package versions with OSV vulnerability data
 - persisting vulnerabilities and findings into PostgreSQL
 - exposing read APIs over REST
+- exposing read tools over MCP (stdio)
 
 The project does not yet support:
 
 - dependency graph persistence
 - Trivy enrichment
-- MCP tools
 - scheduled or background scan processing
 - test coverage
 
@@ -83,6 +83,20 @@ go run ./cmd/api
 ```
 
 By default the API listens on `:8080`.
+
+### Run the MCP server
+
+```bash
+go run ./cmd/mcp
+```
+
+The MCP server runs over stdio and exposes these tools:
+
+- `list_assets`
+- `get_asset_summary`
+- `get_scan_summary`
+- `list_asset_findings`
+- `list_scan_findings`
 
 ## REST API
 
@@ -212,6 +226,52 @@ Example asset summary response:
   }
 }
 ```
+
+## MCP Tools
+
+The MCP server exposes the same read model as the REST API, but as tools instead of HTTP endpoints.
+
+Summary tools:
+
+- `list_assets`
+  - input: none
+- `get_asset_summary`
+  - input: `asset_id`
+- `get_scan_summary`
+  - input: `scan_id`
+
+Findings tools:
+
+- `list_asset_findings`
+  - input:
+    - `id`
+    - `limit`
+    - `offset`
+    - `ecosystem`
+    - `package`
+    - `status`
+    - `vulnerability`
+    - `severity_label`
+    - `sort_by`
+    - `order`
+- `list_scan_findings`
+  - same input shape as `list_asset_findings`
+
+Tool defaults match the REST API:
+
+- `limit` defaults to `50`
+- `limit` is capped at `200`
+- `offset` defaults to `0`
+- `order` must be `asc` or `desc`
+
+Supported `sort_by` values:
+
+- `id`
+- `package`
+- `version`
+- `vulnerability`
+- `severity`
+- `scan_id`
 
 ### Inspect stored data
 
