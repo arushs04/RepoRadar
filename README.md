@@ -1,47 +1,67 @@
 # SupplyGraph
 
-SupplyGraph is a backend project for scanning software assets, normalizing package inventory, enriching package versions with vulnerability data, and eventually exposing dependency, vulnerability, and risk analysis through structured APIs and MCP tools.
+SupplyGraph scans public repositories, generates an SBOM with Syft, normalizes package inventory into PostgreSQL, enriches npm packages with OSV vulnerability data, exposes the results through REST and MCP, and provides a local AI-assisted UI for reviewing findings.
 
-Detailed implementation notes live in [docs/IMPLEMENTATION_GUIDE.md](/Users/arushsacheti/Downloads/Arush_Job_Search/projects/SupplyGraph/docs/IMPLEMENTATION_GUIDE.md).
+Detailed code-level notes live in [docs/IMPLEMENTATION_GUIDE.md](/Users/arushsacheti/Downloads/Arush_Job_Search/projects/SupplyGraph/docs/IMPLEMENTATION_GUIDE.md).
 
-## Current Status
+## What It Does
 
-The project currently supports:
+- accepts a public GitHub repository URL
+- creates a scan job
+- downloads and extracts the repository tarball
+- runs `syft` automatically
+- persists assets, scans, components, component versions, vulnerabilities, and findings
+- normalizes CVSS vectors into `severity_score` and `severity_label`
+- serves a browser UI at `http://localhost:8080/`
+- exposes the same read model over REST and MCP
+- adds a local Ollama-powered chat layer on top of scan results
 
-- parsing Syft JSON output from a saved file
-- filtering and normalizing package-like artifacts
-- persisting assets and scans into PostgreSQL
-- persisting normalized components, component versions, and scan membership
-- enriching npm package versions with OSV vulnerability data
-- persisting vulnerabilities and findings into PostgreSQL
-- exposing read APIs over REST
-- exposing read tools over MCP (stdio)
-- serving a browser UI for repo submission, job tracking, and findings review
+## Current Scope
 
-The project does not yet support:
+Implemented:
+
+- public GitHub repo scanning
+- Syft JSON ingestion
+- npm vulnerability enrichment via OSV
+- severity normalization for CVSS 3.x and 4.0 vectors
+- scan and asset summaries
+- findings filtering, pagination, and sorting
+- MCP read tools
+- embedded browser UI
+- local AI analyst chat
+
+Not implemented:
 
 - dependency graph persistence
-- Trivy enrichment
-- scheduled or background scan processing
-- test coverage
+- ecosystems beyond the current OSV enrichment path
+- external auth or multi-user support
+- production-grade background worker separation
+- broad automated test coverage
 
-## Tech Stack
+## Architecture
 
-- Go
-- PostgreSQL
-- Docker Compose
-- Syft
-- OSV
+Main runtime pieces:
 
-## Local Development
+- [cmd/api/main.go](/Users/arushsacheti/Downloads/Arush_Job_Search/projects/SupplyGraph/cmd/api/main.go): API entrypoint, embedded UI host, scan job runner bootstrap, Ollama wiring
+- [cmd/ingest/main.go](/Users/arushsacheti/Downloads/Arush_Job_Search/projects/SupplyGraph/cmd/ingest/main.go): ingest a saved Syft JSON file directly
+- [cmd/mcp/main.go](/Users/arushsacheti/Downloads/Arush_Job_Search/projects/SupplyGraph/cmd/mcp/main.go): stdio MCP server
+- [internal/scanjobs/runner.go](/Users/arushsacheti/Downloads/Arush_Job_Search/projects/SupplyGraph/internal/scanjobs/runner.go): repo scan orchestration
+- [internal/github/public_repo.go](/Users/arushsacheti/Downloads/Arush_Job_Search/projects/SupplyGraph/internal/github/public_repo.go): public GitHub resolution and tarball extraction
+- [internal/ingest/ingest.go](/Users/arushsacheti/Downloads/Arush_Job_Search/projects/SupplyGraph/internal/ingest/ingest.go): inventory persistence and enrichment orchestration
+- [internal/api/server.go](/Users/arushsacheti/Downloads/Arush_Job_Search/projects/SupplyGraph/internal/api/server.go): REST handlers and static UI serving
+- [internal/mcpserver/server.go](/Users/arushsacheti/Downloads/Arush_Job_Search/projects/SupplyGraph/internal/mcpserver/server.go): MCP tool layer
+- [internal/ai/chat.go](/Users/arushsacheti/Downloads/Arush_Job_Search/projects/SupplyGraph/internal/ai/chat.go): AI prompt orchestration
+- [internal/ollama/client.go](/Users/arushsacheti/Downloads/Arush_Job_Search/projects/SupplyGraph/internal/ollama/client.go): local Ollama client
 
-### Start PostgreSQL
+## Local Setup
+
+### 1. Start PostgreSQL
 
 ```bash
 docker compose up -d
 ```
 
-### Apply database migrations
+### 2. Apply migrations
 
 ```bash
 docker exec -i supplygraph-postgres psql -U supplygraph -d supplygraph < migrations/001_init.sql
@@ -50,61 +70,91 @@ docker exec -i supplygraph-postgres psql -U supplygraph -d supplygraph < migrati
 docker exec -i supplygraph-postgres psql -U supplygraph -d supplygraph < migrations/004_scan_jobs.sql
 ```
 
-### Set the database connection string
+### 3. Set `DATABASE_URL`
 
-If your Docker PostgreSQL instance is exposed on port `5432`:
+If Postgres is exposed on `5433`:
 
 ```bash
-export DATABASE_URL="postgres://supplygraph:supplygraph@localhost:5432/supplygraph?sslmode=disable"
+export DATABASE_URL="postgres://supplygraph:supplygraph@localhost:5433/supplygraph?sslmode=disable"
 ```
 
-If you remap the container to a different host port, update the URL accordingly.
+If your container is mapped to `5432`, use that instead.
 
-### Generate a Syft JSON scan
+Verify it:
 
 ```bash
-syft /path/to/asset -o json > deps.json
+echo $DATABASE_URL
 ```
 
-The automated repo scanning flow also shells out to `syft`, so `syft` must be installed on the machine running the API.
+### 4. Install Syft
 
-### Run ingestion against a saved Syft JSON file
+SupplyGraph shells out to `syft` during repo scans, so `syft` must be installed on the machine running the API.
+
+Example check:
 
 ```bash
-go run ./cmd/ingest /path/to/deps.json /path/to/scanned/asset
+syft version
 ```
 
-Example:
+### 5. Optional: install Ollama for local AI chat
+
+If you want the AI panel:
 
 ```bash
-go run ./cmd/ingest /Users/arushsacheti/Downloads/argo-cd-master/deps.json /Users/arushsacheti/Downloads/argo-cd-master
+brew install ollama
+ollama serve
 ```
 
-### Run the REST API
+In another terminal:
 
 ```bash
+ollama pull qwen2.5:1.5b
+```
+
+If Ollama is not installed or not running, the main app still works, but `/chat` and the AI panel will not.
+
+## Running the App
+
+Start the API and UI:
+
+```bash
+cd /Users/arushsacheti/Downloads/Arush_Job_Search/projects/SupplyGraph
 go run ./cmd/api
 ```
 
-By default the API listens on `:8080` and now also serves the web UI at:
+Default address:
 
 ```text
 http://localhost:8080/
 ```
 
-### Run the MCP server
+Optional env vars:
 
 ```bash
-go run ./cmd/mcp
+export API_ADDR=":8080"
+export OLLAMA_BASE_URL="http://127.0.0.1:11434"
+export OLLAMA_MODEL="qwen2.5:1.5b"
 ```
 
-The MCP server runs over stdio and exposes these tools:
+## Browser Demo Flow
 
-- `list_assets`
-- `get_asset_summary`
-- `get_scan_summary`
-- `list_asset_findings`
-- `list_scan_findings`
+1. Open `http://localhost:8080/`
+2. Paste a public GitHub repo URL
+3. Submit the scan job
+4. Watch job progress
+5. Review asset summary, scan summary, and findings
+6. Filter and sort findings
+7. Ask the local AI questions about the current scan
+
+The embedded UI supports:
+
+- repo submission
+- scan job tracking
+- recent job history
+- asset and scan summaries
+- findings filtering by severity and package
+- findings sorting
+- local AI analyst chat
 
 ## REST API
 
@@ -120,20 +170,9 @@ Implemented endpoints:
 - `GET /scans/:id`
 - `GET /scans/:id/findings`
 - `GET /scans/:id/summary`
+- `POST /chat`
 
-Example requests:
-
-```bash
-curl http://localhost:8080/assets
-curl http://localhost:8080/assets/<asset-id>/findings
-curl http://localhost:8080/assets/<asset-id>/summary
-curl http://localhost:8080/scan-jobs
-curl http://localhost:8080/scans/<scan-id>
-curl http://localhost:8080/scans/<scan-id>/findings
-curl http://localhost:8080/scans/<scan-id>/summary
-```
-
-Submit a public GitHub repository for scanning:
+### Example scan submission
 
 ```bash
 curl -X POST http://localhost:8080/scan-jobs \
@@ -141,54 +180,61 @@ curl -X POST http://localhost:8080/scan-jobs \
   -d '{"repo_url":"https://github.com/argoproj/argo-cd"}'
 ```
 
-Poll a job:
+### Poll a job
 
 ```bash
 curl http://localhost:8080/scan-jobs/<job-id>
 ```
 
-### Browser workflow
+### List assets
 
-Open:
-
-```text
-http://localhost:8080/
+```bash
+curl http://localhost:8080/assets
 ```
 
-The UI supports:
+### Fetch summaries
 
-- submit a public GitHub repo URL
-- watch scan job progress
-- inspect recent jobs
-- review normalized severity summaries
-- filter findings by severity and package
-- sort findings by severity, package, vulnerability, version, or ID
+```bash
+curl http://localhost:8080/assets/<asset-id>/summary
+curl http://localhost:8080/scans/<scan-id>/summary
+```
 
-Filtering and pagination for findings endpoints:
+### Findings queries
 
 ```bash
 curl "http://localhost:8080/scans/<scan-id>/findings?limit=10&offset=0"
-curl "http://localhost:8080/scans/<scan-id>/findings?package=minimatch"
-curl "http://localhost:8080/scans/<scan-id>/findings?ecosystem=npm&status=open"
-curl "http://localhost:8080/scans/<scan-id>/findings?vulnerability=GHSA-2g4f-4pwh-qvx6"
 curl "http://localhost:8080/scans/<scan-id>/findings?severity_label=high"
-curl "http://localhost:8080/assets/<asset-id>/findings?limit=25&package=axios"
-curl "http://localhost:8080/scans/<scan-id>/findings?sort_by=package&order=asc"
-curl "http://localhost:8080/scans/<scan-id>/findings?sort_by=vulnerability&order=desc"
+curl "http://localhost:8080/scans/<scan-id>/findings?package=minimatch"
 curl "http://localhost:8080/scans/<scan-id>/findings?sort_by=severity&order=desc"
+curl "http://localhost:8080/assets/<asset-id>/findings?package=axios&limit=5"
 ```
 
-Supported sorting:
+Supported findings filters:
 
-- `sort_by=id`
-- `sort_by=package`
-- `sort_by=version`
-- `sort_by=vulnerability`
-- `sort_by=severity`
-- `sort_by=scan_id`
-- `order=asc|desc`
+- `limit`
+- `offset`
+- `ecosystem`
+- `package`
+- `status`
+- `vulnerability`
+- `severity_label`
+- `sort_by`
+- `order`
 
-Findings endpoints now return a paginated envelope:
+Supported `sort_by` values:
+
+- `id`
+- `package`
+- `version`
+- `vulnerability`
+- `severity`
+- `scan_id`
+
+`order` must be `asc` or `desc`.
+
+### Findings response shape
+
+Findings endpoints return a paginated envelope:
 
 ```json
 {
@@ -225,139 +271,124 @@ Findings endpoints now return a paginated envelope:
 }
 ```
 
-Example summary response:
+## MCP
 
-```json
-{
-  "scan_id": "3aa17844-84ea-4868-9f8c-bbbd7906485d",
-  "total_findings": 66,
-  "unique_vulnerabilities": 40,
-  "unique_packages_affected": 29,
-  "ecosystem_counts": {
-    "npm": 66
-  },
-  "severity_counts": {
-    "critical": 0,
-    "high": 12,
-    "medium": 39,
-    "low": 10,
-    "unknown": 5
-  }
-}
+Run the MCP server:
+
+```bash
+go run ./cmd/mcp
 ```
 
-Example asset summary response:
-
-```json
-{
-  "asset_id": "28e76e7f-0b38-4532-930c-cfe478c1a2bd",
-  "total_scans": 4,
-  "latest_scan_id": "3aa17844-84ea-4868-9f8c-bbbd7906485d",
-  "total_findings": 66,
-  "unique_vulnerabilities": 45,
-  "unique_packages_affected": 40,
-  "ecosystem_counts": {
-    "npm": 66
-  },
-  "severity_counts": {
-    "critical": 1,
-    "high": 32,
-    "medium": 19,
-    "low": 10,
-    "none": 0,
-    "unknown": 4
-  }
-}
-```
-
-## MCP Tools
-
-The MCP server exposes the same read model as the REST API, but as tools instead of HTTP endpoints.
-
-Summary tools:
+Exposed tools:
 
 - `list_assets`
-  - input: none
 - `get_asset_summary`
-  - input: `asset_id`
 - `get_scan_summary`
-  - input: `scan_id`
-
-Findings tools:
-
 - `list_asset_findings`
-  - input:
-    - `id`
-    - `limit`
-    - `offset`
-    - `ecosystem`
-    - `package`
-    - `status`
-    - `vulnerability`
-    - `severity_label`
-    - `sort_by`
-    - `order`
 - `list_scan_findings`
-  - same input shape as `list_asset_findings`
 
-Tool defaults match the REST API:
+These MCP tools expose the same read model as the REST API, but for AI tool calling instead of HTTP clients.
 
-- `limit` defaults to `50`
-- `limit` is capped at `200`
-- `offset` defaults to `0`
-- `order` must be `asc` or `desc`
+## Direct Ingestion Mode
 
-Supported `sort_by` values:
+If you already have a Syft JSON file, you can bypass repo scanning and ingest directly:
 
-- `id`
-- `package`
-- `version`
-- `vulnerability`
-- `severity`
-- `scan_id`
+```bash
+go run ./cmd/ingest /path/to/deps.json /path/to/scanned/asset
+```
 
-### Inspect stored data
+Example:
+
+```bash
+go run ./cmd/ingest /Users/arushsacheti/Downloads/argo-cd-master/deps.json /Users/arushsacheti/Downloads/argo-cd-master
+```
+
+## Inspecting the Database
+
+Open psql:
 
 ```bash
 docker exec -it supplygraph-postgres psql -U supplygraph -d supplygraph
 ```
 
-Example queries:
+Useful checks:
 
 ```sql
-SELECT * FROM assets;
+SELECT COUNT(*) FROM assets;
 SELECT COUNT(*) FROM scans;
-SELECT COUNT(*) FROM components;
-SELECT COUNT(*) FROM component_versions;
 SELECT COUNT(*) FROM vulnerabilities;
 SELECT COUNT(*) FROM findings;
+SELECT external_id, severity, severity_score, severity_label
+FROM vulnerabilities
+LIMIT 20;
 ```
 
-## Current Data Model
+## Troubleshooting
 
-Implemented tables:
+### `DATABASE_URL is not set`
 
-- `assets`
-- `scans`
-- `components`
-- `component_versions`
-- `scan_component_versions`
-- `vulnerabilities`
-- `findings`
+Set the env var before `go run ./cmd/api`:
+
+```bash
+export DATABASE_URL="postgres://supplygraph:supplygraph@localhost:5433/supplygraph?sslmode=disable"
+```
+
+### `role "supplygraph" does not exist`
+
+You are likely pointing at the wrong Postgres instance or wrong host port. Check:
+
+```bash
+docker ps
+echo $DATABASE_URL
+```
+
+### `zsh: command not found: ollama`
+
+Install Ollama first:
+
+```bash
+brew install ollama
+```
+
+### Repo scan fails before ingest
+
+Check:
+
+- `syft` is installed and available in `PATH`
+- `DATABASE_URL` points at the correct Postgres instance
+- the submitted repo is public and on `github.com`
 
 ## Project Layout
 
 ```text
-cmd/ingest/          CLI entrypoint for ingestion workflow
-cmd/api/             REST API entrypoint
+cmd/api/             API entrypoint and embedded UI host
+cmd/ingest/          Direct Syft JSON ingest entrypoint
+cmd/mcp/             MCP entrypoint
 docs/                Longer implementation documentation
-internal/ingest/     Inventory persistence and OSV enrichment workflows
-internal/api/        REST handlers and response shaping
-internal/db/         PostgreSQL connection and persistence helpers
-internal/model/      Normalized application/domain models
+internal/ai/         AI chat orchestration
+internal/api/        REST handlers and embedded web assets
+internal/db/         PostgreSQL connection and repository methods
+internal/github/     Public GitHub resolution and tarball extraction
+internal/ingest/     Inventory persistence and OSV enrichment
+internal/mcpserver/  MCP server and tool definitions
+internal/model/      Domain models
+internal/ollama/     Local Ollama client
 internal/osv/        OSV client and response types
-internal/severity/   CVSS parsing and severity normalization
-internal/syft/       Syft JSON parsing and normalization logic
-migrations/          Database schema SQL
-docker-compose.yml   Local PostgreSQL development environment
+internal/scanjobs/   Repo scanning job runner
+internal/severity/   CVSS normalization
+internal/syft/       Syft JSON parsing and normalization
+migrations/          Schema migrations
+docker-compose.yml   Local Postgres
 ```
+
+## Final Notes
+
+SupplyGraph is now in a good demo-ready state:
+
+- public repo URL in
+- automated scan pipeline
+- normalized vulnerability data out
+- REST and MCP access
+- local AI chat on top
+
+If you want to extend it further later, the next logical steps are worker separation, deployment, and stronger coverage around scan and enrichment flows.

@@ -4,6 +4,7 @@ const state = {
   activeAssetId: null,
   activeScanId: null,
   pollTimer: null,
+  chatHistory: [],
 };
 
 const elements = {
@@ -39,6 +40,12 @@ const elements = {
   sortFilter: document.getElementById("sort-filter"),
   orderFilter: document.getElementById("order-filter"),
   applyFilters: document.getElementById("apply-filters"),
+  chatMessages: document.getElementById("chat-messages"),
+  chatForm: document.getElementById("chat-form"),
+  chatInput: document.getElementById("chat-input"),
+  chatSubmit: document.getElementById("chat-submit"),
+  chatError: document.getElementById("chat-error"),
+  chatModel: document.getElementById("chat-model"),
 };
 
 const severityOrder = ["critical", "high", "medium", "low", "none", "unknown"];
@@ -49,6 +56,14 @@ elements.applyFilters.addEventListener("click", () => {
   if (state.activeScanId) {
     loadResults(state.activeAssetId, state.activeScanId);
   }
+});
+elements.chatForm.addEventListener("submit", handleChatSubmit);
+
+document.querySelectorAll(".suggestion").forEach((button) => {
+  button.addEventListener("click", () => {
+    elements.chatInput.value = button.getAttribute("data-question") || "";
+    elements.chatInput.focus();
+  });
 });
 
 async function handleSubmit(event) {
@@ -148,6 +163,7 @@ async function loadJob(jobId, focusResults = false) {
 }
 
 function setActiveJob(job) {
+  const changedScan = state.activeScanId && state.activeScanId !== job.scan_id;
   state.activeJobId = job.id;
   state.activeJob = job;
 
@@ -169,6 +185,10 @@ function setActiveJob(job) {
 
   updateTimeline(job.status);
   managePolling(job);
+
+  if (changedScan) {
+    resetChat();
+  }
 
   if (job.status === "completed" && job.asset_id && job.scan_id) {
     loadResults(job.asset_id, job.scan_id);
@@ -310,6 +330,80 @@ function renderFindings(page) {
       `;
     })
     .join("");
+}
+
+async function handleChatSubmit(event) {
+  event.preventDefault();
+  hideError(elements.chatError);
+
+  if (!state.activeScanId) {
+    showError(elements.chatError, "Wait for a scan to complete before using the AI analyst.");
+    return;
+  }
+
+  const question = elements.chatInput.value.trim();
+  if (!question) {
+    showError(elements.chatError, "Enter a question for the AI analyst.");
+    return;
+  }
+
+  appendChatMessage("user", question);
+  state.chatHistory.push({ role: "user", content: question });
+  elements.chatInput.value = "";
+  elements.chatSubmit.disabled = true;
+  elements.chatSubmit.textContent = "Thinking...";
+
+  try {
+    const response = await fetch("/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        asset_id: state.activeAssetId,
+        scan_id: state.activeScanId,
+        question,
+        history: state.chatHistory.filter((message) => message.role === "user" || message.role === "assistant"),
+      }),
+    });
+
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "Chat request failed.");
+    }
+
+    elements.chatModel.textContent = `Model: ${payload.model}`;
+    appendChatMessage("assistant", payload.answer);
+    state.chatHistory.push({ role: "assistant", content: payload.answer });
+  } catch (error) {
+    showError(elements.chatError, error.message);
+  } finally {
+    elements.chatSubmit.disabled = false;
+    elements.chatSubmit.textContent = "Ask";
+  }
+}
+
+function appendChatMessage(role, content) {
+  const empty = elements.chatMessages.querySelector(".chat-empty");
+  if (empty) {
+    empty.remove();
+  }
+
+  const message = document.createElement("div");
+  message.className = `chat-message ${role}`;
+  message.innerHTML = `
+    <span class="chat-role">${role === "user" ? "You" : "SupplyGraph AI"}</span>
+    ${escapeHTML(content)}
+  `;
+  elements.chatMessages.appendChild(message);
+  elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
+}
+
+function resetChat() {
+  state.chatHistory = [];
+  elements.chatMessages.innerHTML = `<div class="chat-empty">Ask a question once a scan completes.</div>`;
+  elements.chatModel.textContent = "Model: not connected";
+  hideError(elements.chatError);
 }
 
 function showError(element, message) {

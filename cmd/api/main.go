@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"os"
 
+	"supplygraph/internal/ai"
 	"supplygraph/internal/api"
 	"supplygraph/internal/db"
+	"supplygraph/internal/ollama"
 	"supplygraph/internal/scanjobs"
 )
 
@@ -24,7 +26,9 @@ func main() {
 		log.Fatalf("resume queued scan jobs: %v", err)
 	}
 
-	server := api.NewServer(repo, runner)
+	ollamaClient := ollama.NewClient()
+	chatAI := ai.NewService(repo, ollamaClient)
+	server := api.NewServer(repo, runner, chatAI)
 
 	addr := os.Getenv("API_ADDR")
 	if addr == "" {

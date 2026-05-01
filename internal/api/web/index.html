@@ -188,8 +188,48 @@
             <button id="apply-filters" type="button">Apply</button>
           </div>
 
-          <div id="findings-meta" class="findings-meta"></div>
-          <div id="findings-list" class="findings-list"></div>
+          <div class="results-grid">
+            <div class="results-main">
+              <div id="findings-meta" class="findings-meta"></div>
+              <div id="findings-list" class="findings-list"></div>
+            </div>
+
+            <aside class="chat-panel">
+              <div class="panel-header">
+                <div>
+                  <p class="section-kicker">AI analyst</p>
+                  <h3>Ask about this scan</h3>
+                </div>
+                <span class="pill">Local model</span>
+              </div>
+              <div class="chat-suggestions">
+                <button type="button" class="ghost-button suggestion" data-question="What should I fix first?">
+                  What should I fix first?
+                </button>
+                <button type="button" class="ghost-button suggestion" data-question="Summarize the security posture of this repo.">
+                  Summarize the security posture
+                </button>
+                <button type="button" class="ghost-button suggestion" data-question="Which packages are driving the most risk?">
+                  Which packages drive the most risk?
+                </button>
+              </div>
+              <div id="chat-messages" class="chat-messages">
+                <div class="chat-empty">Ask a question once a scan completes.</div>
+              </div>
+              <form id="chat-form" class="chat-form">
+                <textarea
+                  id="chat-input"
+                  rows="4"
+                  placeholder="Ask about the current asset, scan, or highest-risk findings..."
+                ></textarea>
+                <div class="chat-actions">
+                  <span id="chat-model" class="meta-value">Model: not connected</span>
+                  <button id="chat-submit" type="submit">Ask</button>
+                </div>
+              </form>
+              <div id="chat-error" class="inline-error hidden"></div>
+            </aside>
+          </div>
         </section>
       </main>
     </div>

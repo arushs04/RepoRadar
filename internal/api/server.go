@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"supplygraph/internal/ai"
 	"supplygraph/internal/db"
 	"supplygraph/internal/model"
 	"supplygraph/internal/scanjobs"
@@ -21,13 +22,15 @@ var webFS embed.FS
 type Server struct {
 	repo   *db.Repository
 	runner *scanjobs.Runner
+	chatAI *ai.Service
 	mux    *http.ServeMux
 }
 
-func NewServer(repo *db.Repository, runner *scanjobs.Runner) *Server {
+func NewServer(repo *db.Repository, runner *scanjobs.Runner, chatAI *ai.Service) *Server {
 	server := &Server{
 		repo:   repo,
 		runner: runner,
+		chatAI: chatAI,
 		mux:    http.NewServeMux(),
 	}
 
@@ -50,9 +53,35 @@ func (s *Server) routes() {
 	s.mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(webRoot))))
 	s.mux.HandleFunc("/assets", s.handleAssets)
 	s.mux.HandleFunc("/assets/", s.handleAssetByID)
+	s.mux.HandleFunc("/chat", s.handleChat)
 	s.mux.HandleFunc("/scan-jobs", s.handleScanJobs)
 	s.mux.HandleFunc("/scan-jobs/", s.handleScanJobByID)
 	s.mux.HandleFunc("/scans/", s.handleScans)
+}
+
+func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeMethodNotAllowed(w)
+		return
+	}
+	if s.chatAI == nil {
+		writeInternalError(w, fmt.Errorf("chat ai is not configured"))
+		return
+	}
+
+	var request ai.ChatRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		writeBadRequest(w, "invalid json body")
+		return
+	}
+
+	response, err := s.chatAI.Chat(r.Context(), request)
+	if err != nil {
+		writeInternalError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (s *Server) handleScanJobs(w http.ResponseWriter, r *http.Request) {
