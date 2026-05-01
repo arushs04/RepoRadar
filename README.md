@@ -46,6 +46,7 @@ docker compose up -d
 docker exec -i supplygraph-postgres psql -U supplygraph -d supplygraph < migrations/001_init.sql
 docker exec -i supplygraph-postgres psql -U supplygraph -d supplygraph < migrations/002_vulnerabilities.sql
 docker exec -i supplygraph-postgres psql -U supplygraph -d supplygraph < migrations/003_severity_normalization.sql
+docker exec -i supplygraph-postgres psql -U supplygraph -d supplygraph < migrations/004_scan_jobs.sql
 ```
 
 ### Set the database connection string
@@ -63,6 +64,8 @@ If you remap the container to a different host port, update the URL accordingly.
 ```bash
 syft /path/to/asset -o json > deps.json
 ```
+
+The automated repo scanning flow also shells out to `syft`, so `syft` must be installed on the machine running the API.
 
 ### Run ingestion against a saved Syft JSON file
 
@@ -106,6 +109,9 @@ Implemented endpoints:
 - `GET /assets/:id`
 - `GET /assets/:id/findings`
 - `GET /assets/:id/summary`
+- `GET /scan-jobs`
+- `POST /scan-jobs`
+- `GET /scan-jobs/:id`
 - `GET /scans/:id`
 - `GET /scans/:id/findings`
 - `GET /scans/:id/summary`
@@ -116,9 +122,24 @@ Example requests:
 curl http://localhost:8080/assets
 curl http://localhost:8080/assets/<asset-id>/findings
 curl http://localhost:8080/assets/<asset-id>/summary
+curl http://localhost:8080/scan-jobs
 curl http://localhost:8080/scans/<scan-id>
 curl http://localhost:8080/scans/<scan-id>/findings
 curl http://localhost:8080/scans/<scan-id>/summary
+```
+
+Submit a public GitHub repository for scanning:
+
+```bash
+curl -X POST http://localhost:8080/scan-jobs \
+  -H "Content-Type: application/json" \
+  -d '{"repo_url":"https://github.com/argoproj/argo-cd"}'
+```
+
+Poll a job:
+
+```bash
+curl http://localhost:8080/scan-jobs/<job-id>
 ```
 
 Filtering and pagination for findings endpoints:

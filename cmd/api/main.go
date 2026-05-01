@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
 
 	"supplygraph/internal/api"
 	"supplygraph/internal/db"
+	"supplygraph/internal/scanjobs"
 )
 
 func main() {
@@ -17,7 +19,12 @@ func main() {
 	defer database.Close()
 
 	repo := db.NewRepository(database)
-	server := api.NewServer(repo)
+	runner := scanjobs.NewRunner(repo)
+	if err := runner.ResumeQueuedJobs(context.Background()); err != nil {
+		log.Fatalf("resume queued scan jobs: %v", err)
+	}
+
+	server := api.NewServer(repo, runner)
 
 	addr := os.Getenv("API_ADDR")
 	if addr == "" {

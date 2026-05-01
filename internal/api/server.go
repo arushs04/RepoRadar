@@ -10,17 +10,20 @@ import (
 
 	"supplygraph/internal/db"
 	"supplygraph/internal/model"
+	"supplygraph/internal/scanjobs"
 )
 
 type Server struct {
-	repo *db.Repository
-	mux  *http.ServeMux
+	repo   *db.Repository
+	runner *scanjobs.Runner
+	mux    *http.ServeMux
 }
 
-func NewServer(repo *db.Repository) *Server {
+func NewServer(repo *db.Repository, runner *scanjobs.Runner) *Server {
 	server := &Server{
-		repo: repo,
-		mux:  http.NewServeMux(),
+		repo:   repo,
+		runner: runner,
+		mux:    http.NewServeMux(),
 	}
 
 	server.routes()
@@ -35,7 +38,81 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Server) routes() {
 	s.mux.HandleFunc("/assets", s.handleAssets)
 	s.mux.HandleFunc("/assets/", s.handleAssetByID)
+	s.mux.HandleFunc("/scan-jobs", s.handleScanJobs)
+	s.mux.HandleFunc("/scan-jobs/", s.handleScanJobByID)
 	s.mux.HandleFunc("/scans/", s.handleScans)
+}
+
+func (s *Server) handleScanJobs(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		s.handleListScanJobs(w, r)
+	case http.MethodPost:
+		s.handleCreateScanJob(w, r)
+	default:
+		writeMethodNotAllowed(w)
+	}
+}
+
+func (s *Server) handleScanJobByID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeMethodNotAllowed(w)
+		return
+	}
+
+	id := strings.TrimPrefix(r.URL.Path, "/scan-jobs/")
+	if id == "" || strings.Contains(id, "/") {
+		writeNotFound(w)
+		return
+	}
+
+	job, err := s.repo.GetScanJobByID(r.Context(), id)
+	if err != nil {
+		writeInternalError(w, err)
+		return
+	}
+	if job == nil {
+		writeNotFound(w)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, newScanJobResponse(job))
+}
+
+func (s *Server) handleListScanJobs(w http.ResponseWriter, r *http.Request) {
+	jobs, err := s.repo.ListScanJobs(r.Context(), 25)
+	if err != nil {
+		writeInternalError(w, err)
+		return
+	}
+
+	response := make([]scanJobResponse, 0, len(jobs))
+	for _, job := range jobs {
+		response = append(response, newScanJobResponse(job))
+	}
+
+	writeJSON(w, http.StatusOK, response)
+}
+
+func (s *Server) handleCreateScanJob(w http.ResponseWriter, r *http.Request) {
+	if s.runner == nil {
+		writeInternalError(w, fmt.Errorf("scan job runner is not configured"))
+		return
+	}
+
+	var request createScanJobRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		writeBadRequest(w, "invalid json body")
+		return
+	}
+
+	job, err := s.runner.SubmitGitHubRepo(r.Context(), request.RepoURL)
+	if err != nil {
+		writeBadRequest(w, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, newScanJobResponse(job))
 }
 
 func (s *Server) handleAssets(w http.ResponseWriter, r *http.Request) {
@@ -323,6 +400,25 @@ type findingsPageResponse struct {
 	Offset int               `json:"offset"`
 }
 
+type createScanJobRequest struct {
+	RepoURL string `json:"repo_url"`
+}
+
+type scanJobResponse struct {
+	ID                string  `json:"id"`
+	RepoURL           string  `json:"repo_url"`
+	RepoOwner         string  `json:"repo_owner"`
+	RepoName          string  `json:"repo_name"`
+	RepoDefaultBranch *string `json:"repo_default_branch"`
+	Status            string  `json:"status"`
+	AssetID           *string `json:"asset_id"`
+	ScanID            *string `json:"scan_id"`
+	Error             *string `json:"error"`
+	CreatedAt         string  `json:"created_at"`
+	StartedAt         *string `json:"started_at"`
+	CompletedAt       *string `json:"completed_at"`
+}
+
 func newFindingResponse(finding model.ExpandedFinding) findingResponse {
 	return findingResponse{
 		ID:            finding.Finding.ID,
@@ -335,6 +431,35 @@ func newFindingResponse(finding model.ExpandedFinding) findingResponse {
 			Version:   finding.ComponentVersion.Version,
 			Component: newComponentResponse(finding.Component),
 		},
+	}
+}
+
+func newScanJobResponse(job *model.ScanJob) scanJobResponse {
+	var startedAt *string
+	if job.StartedAt != nil {
+		value := job.StartedAt.UTC().Format(time.RFC3339)
+		startedAt = &value
+	}
+
+	var completedAt *string
+	if job.CompletedAt != nil {
+		value := job.CompletedAt.UTC().Format(time.RFC3339)
+		completedAt = &value
+	}
+
+	return scanJobResponse{
+		ID:                job.ID,
+		RepoURL:           job.RepoURL,
+		RepoOwner:         job.RepoOwner,
+		RepoName:          job.RepoName,
+		RepoDefaultBranch: job.RepoDefaultBranch,
+		Status:            job.Status,
+		AssetID:           job.AssetID,
+		ScanID:            job.ScanID,
+		Error:             job.Error,
+		CreatedAt:         job.CreatedAt.UTC().Format(time.RFC3339Nano),
+		StartedAt:         startedAt,
+		CompletedAt:       completedAt,
 	}
 }
 

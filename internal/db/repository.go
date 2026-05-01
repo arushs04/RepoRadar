@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"supplygraph/internal/model"
 )
@@ -16,6 +17,195 @@ type Repository struct {
 
 func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db}
+}
+
+func (r *Repository) CreateScanJob(ctx context.Context, job model.ScanJob) (string, error) {
+	const query = `
+		INSERT INTO scan_jobs (repo_url, repo_owner, repo_name, status)
+		VALUES ($1, $2, $3, $4)
+		RETURNING id
+	`
+
+	var id string
+	if err := r.db.QueryRowContext(ctx, query, job.RepoURL, job.RepoOwner, job.RepoName, job.Status).Scan(&id); err != nil {
+		return "", fmt.Errorf("create scan job: %w", err)
+	}
+
+	return id, nil
+}
+
+func (r *Repository) GetScanJobByID(ctx context.Context, id string) (*model.ScanJob, error) {
+	const query = `
+		SELECT
+			id,
+			repo_url,
+			repo_owner,
+			repo_name,
+			repo_default_branch,
+			status,
+			asset_id,
+			scan_id,
+			error,
+			created_at,
+			started_at,
+			completed_at
+		FROM scan_jobs
+		WHERE id = $1
+	`
+
+	row := r.db.QueryRowContext(ctx, query, id)
+	job, err := scanScanJob(row.Scan)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get scan job by id: %w", err)
+	}
+
+	return job, nil
+}
+
+func (r *Repository) ListScanJobs(ctx context.Context, limit int) ([]*model.ScanJob, error) {
+	if limit <= 0 {
+		limit = 25
+	}
+
+	const query = `
+		SELECT
+			id,
+			repo_url,
+			repo_owner,
+			repo_name,
+			repo_default_branch,
+			status,
+			asset_id,
+			scan_id,
+			error,
+			created_at,
+			started_at,
+			completed_at
+		FROM scan_jobs
+		ORDER BY created_at DESC, id DESC
+		LIMIT $1
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list scan jobs: %w", err)
+	}
+	defer rows.Close()
+
+	var jobs []*model.ScanJob
+	for rows.Next() {
+		job, err := scanScanJob(rows.Scan)
+		if err != nil {
+			return nil, fmt.Errorf("scan scan job row: %w", err)
+		}
+		jobs = append(jobs, job)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate scan jobs: %w", err)
+	}
+
+	return jobs, nil
+}
+
+func (r *Repository) ListRunnableScanJobs(ctx context.Context) ([]*model.ScanJob, error) {
+	const query = `
+		SELECT
+			id,
+			repo_url,
+			repo_owner,
+			repo_name,
+			repo_default_branch,
+			status,
+			asset_id,
+			scan_id,
+			error,
+			created_at,
+			started_at,
+			completed_at
+		FROM scan_jobs
+		WHERE status IN ('pending', 'running')
+		ORDER BY created_at ASC, id ASC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("list runnable scan jobs: %w", err)
+	}
+	defer rows.Close()
+
+	var jobs []*model.ScanJob
+	for rows.Next() {
+		job, err := scanScanJob(rows.Scan)
+		if err != nil {
+			return nil, fmt.Errorf("scan runnable scan job row: %w", err)
+		}
+		jobs = append(jobs, job)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate runnable scan jobs: %w", err)
+	}
+
+	return jobs, nil
+}
+
+func (r *Repository) MarkScanJobRunning(ctx context.Context, id, defaultBranch string, startedAt time.Time) error {
+	const query = `
+		UPDATE scan_jobs
+		SET
+			status = 'running',
+			repo_default_branch = $2,
+			started_at = $3,
+			completed_at = NULL,
+			error = NULL
+		WHERE id = $1
+	`
+
+	if _, err := r.db.ExecContext(ctx, query, id, defaultBranch, startedAt); err != nil {
+		return fmt.Errorf("mark scan job running: %w", err)
+	}
+
+	return nil
+}
+
+func (r *Repository) MarkScanJobCompleted(ctx context.Context, id, assetID, scanID string, completedAt time.Time) error {
+	const query = `
+		UPDATE scan_jobs
+		SET
+			status = 'completed',
+			asset_id = $2,
+			scan_id = $3,
+			error = NULL,
+			completed_at = $4
+		WHERE id = $1
+	`
+
+	if _, err := r.db.ExecContext(ctx, query, id, assetID, scanID, completedAt); err != nil {
+		return fmt.Errorf("mark scan job completed: %w", err)
+	}
+
+	return nil
+}
+
+func (r *Repository) MarkScanJobFailed(ctx context.Context, id, message string, completedAt time.Time) error {
+	const query = `
+		UPDATE scan_jobs
+		SET
+			status = 'failed',
+			error = $2,
+			completed_at = $3
+		WHERE id = $1
+	`
+
+	if _, err := r.db.ExecContext(ctx, query, id, message, completedAt); err != nil {
+		return fmt.Errorf("mark scan job failed: %w", err)
+	}
+
+	return nil
 }
 
 // FindOrCreateAsset reuses an existing asset by (asset_type, source) or creates a new one.
@@ -119,6 +309,22 @@ func (r *Repository) InsertScan(ctx context.Context, scan model.Scan) (string, e
 	}
 
 	return id, nil
+}
+
+func (r *Repository) UpdateScanStatus(ctx context.Context, id, status string, completedAt *time.Time) error {
+	const query = `
+		UPDATE scans
+		SET
+			status = $2,
+			completed_at = $3
+		WHERE id = $1
+	`
+
+	if _, err := r.db.ExecContext(ctx, query, id, status, completedAt); err != nil {
+		return fmt.Errorf("update scan status: %w", err)
+	}
+
+	return nil
 }
 
 func (r *Repository) GetScanByID(ctx context.Context, id string) (*model.Scan, error) {
@@ -826,4 +1032,54 @@ func buildFindingsOrderClause(filter model.FindingsFilter) string {
 	default:
 		return "f.scan_id ASC, f.id ASC"
 	}
+}
+
+func scanScanJob(scan func(dest ...any) error) (*model.ScanJob, error) {
+	job := &model.ScanJob{}
+	var (
+		repoDefaultBranch sql.NullString
+		assetID           sql.NullString
+		scanID            sql.NullString
+		errorMessage      sql.NullString
+		startedAt         sql.NullTime
+		completedAt       sql.NullTime
+	)
+
+	if err := scan(
+		&job.ID,
+		&job.RepoURL,
+		&job.RepoOwner,
+		&job.RepoName,
+		&repoDefaultBranch,
+		&job.Status,
+		&assetID,
+		&scanID,
+		&errorMessage,
+		&job.CreatedAt,
+		&startedAt,
+		&completedAt,
+	); err != nil {
+		return nil, err
+	}
+
+	if repoDefaultBranch.Valid {
+		job.RepoDefaultBranch = &repoDefaultBranch.String
+	}
+	if assetID.Valid {
+		job.AssetID = &assetID.String
+	}
+	if scanID.Valid {
+		job.ScanID = &scanID.String
+	}
+	if errorMessage.Valid {
+		job.Error = &errorMessage.String
+	}
+	if startedAt.Valid {
+		job.StartedAt = &startedAt.Time
+	}
+	if completedAt.Valid {
+		job.CompletedAt = &completedAt.Time
+	}
+
+	return job, nil
 }

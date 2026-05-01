@@ -13,6 +13,10 @@ func LoadDocument(path string) (Document, error) {
 		return Document{}, fmt.Errorf("read syft file: %w", err)
 	}
 
+	return LoadDocumentBytes(data)
+}
+
+func LoadDocumentBytes(data []byte) (Document, error) {
 	var doc Document
 	if err := json.Unmarshal(data, &doc); err != nil {
 		return Document{}, fmt.Errorf("unmarshal syft json: %w", err)

@@ -19,6 +19,21 @@ type Scan struct {
 	CompletedAt *time.Time
 }
 
+type ScanJob struct {
+	ID                string
+	RepoURL           string
+	RepoOwner         string
+	RepoName          string
+	RepoDefaultBranch *string
+	Status            string
+	AssetID           *string
+	ScanID            *string
+	Error             *string
+	CreatedAt         time.Time
+	StartedAt         *time.Time
+	CompletedAt       *time.Time
+}
+
 type Component struct {
 	ID        string
 	Name      string
