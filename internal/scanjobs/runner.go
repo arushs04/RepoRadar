@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"supplygraph/internal/db"
-	gh "supplygraph/internal/github"
-	"supplygraph/internal/ingest"
-	"supplygraph/internal/model"
-	"supplygraph/internal/syft"
+	"reporadar/internal/db"
+	gh "reporadar/internal/github"
+	"reporadar/internal/ingest"
+	"reporadar/internal/model"
+	"reporadar/internal/syft"
 )
 
 type Runner struct {
@@ -92,7 +92,7 @@ func (r *Runner) processJob(ctx context.Context, jobID string) {
 		return
 	}
 
-	tmpDir, err := os.MkdirTemp("", "supplygraph-repo-*")
+	tmpDir, err := os.MkdirTemp("", "reporadar-repo-*")
 	if err != nil {
 		r.failJob(ctx, jobID, fmt.Errorf("create temp directory: %w", err))
 		return

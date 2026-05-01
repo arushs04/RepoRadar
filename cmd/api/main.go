@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"os"
 
-	"supplygraph/internal/ai"
-	"supplygraph/internal/api"
-	"supplygraph/internal/db"
-	"supplygraph/internal/ollama"
-	"supplygraph/internal/scanjobs"
+	"reporadar/internal/ai"
+	"reporadar/internal/api"
+	"reporadar/internal/db"
+	"reporadar/internal/ollama"
+	"reporadar/internal/scanjobs"
 )
 
 func main() {

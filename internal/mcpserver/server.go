@@ -8,8 +8,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"supplygraph/internal/db"
-	"supplygraph/internal/model"
+	"reporadar/internal/db"
+	"reporadar/internal/model"
 )
 
 type Server struct {
@@ -22,13 +22,13 @@ func New(repo *db.Repository) *Server {
 
 func (s *Server) MCP() *mcp.Server {
 	server := mcp.NewServer(&mcp.Implementation{
-		Name:    "supplygraph-mcp",
+		Name:    "reporadar-mcp",
 		Version: "v0.1.0",
 	}, nil)
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "list_assets",
-		Description: "List all known assets that have been ingested into SupplyGraph.",
+		Description: "List all known assets that have been ingested into RepoRadar.",
 	}, s.listAssets)
 
 	mcp.AddTool(server, &mcp.Tool{

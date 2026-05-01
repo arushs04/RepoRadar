@@ -1,6 +1,6 @@
-# SupplyGraph
+# RepoRadar
 
-SupplyGraph scans public repositories, generates an SBOM with Syft, normalizes package inventory into PostgreSQL, enriches npm packages with OSV vulnerability data, exposes the results through REST and MCP, and provides a local AI-assisted UI for reviewing findings.
+RepoRadar scans public repositories, generates an SBOM with Syft, normalizes package inventory into PostgreSQL, enriches npm packages with OSV vulnerability data, exposes the results through REST and MCP, and provides a local AI-assisted UI for reviewing findings.
 
 Detailed code-level notes live in [docs/IMPLEMENTATION_GUIDE.md](/Users/arushsacheti/Downloads/Arush_Job_Search/projects/SupplyGraph/docs/IMPLEMENTATION_GUIDE.md).
 
@@ -64,10 +64,10 @@ docker compose up -d
 ### 2. Apply migrations
 
 ```bash
-docker exec -i supplygraph-postgres psql -U supplygraph -d supplygraph < migrations/001_init.sql
-docker exec -i supplygraph-postgres psql -U supplygraph -d supplygraph < migrations/002_vulnerabilities.sql
-docker exec -i supplygraph-postgres psql -U supplygraph -d supplygraph < migrations/003_severity_normalization.sql
-docker exec -i supplygraph-postgres psql -U supplygraph -d supplygraph < migrations/004_scan_jobs.sql
+docker exec -i reporadar-postgres psql -U reporadar -d reporadar < migrations/001_init.sql
+docker exec -i reporadar-postgres psql -U reporadar -d reporadar < migrations/002_vulnerabilities.sql
+docker exec -i reporadar-postgres psql -U reporadar -d reporadar < migrations/003_severity_normalization.sql
+docker exec -i reporadar-postgres psql -U reporadar -d reporadar < migrations/004_scan_jobs.sql
 ```
 
 ### 3. Set `DATABASE_URL`
@@ -75,7 +75,7 @@ docker exec -i supplygraph-postgres psql -U supplygraph -d supplygraph < migrati
 If Postgres is exposed on `5433`:
 
 ```bash
-export DATABASE_URL="postgres://supplygraph:supplygraph@localhost:5433/supplygraph?sslmode=disable"
+export DATABASE_URL="postgres://reporadar:reporadar@localhost:5433/reporadar?sslmode=disable"
 ```
 
 If your container is mapped to `5432`, use that instead.
@@ -88,7 +88,7 @@ echo $DATABASE_URL
 
 ### 4. Install Syft
 
-SupplyGraph shells out to `syft` during repo scans, so `syft` must be installed on the machine running the API.
+RepoRadar shells out to `syft` during repo scans, so `syft` must be installed on the machine running the API.
 
 Example check:
 
@@ -308,7 +308,7 @@ go run ./cmd/ingest /Users/arushsacheti/Downloads/argo-cd-master/deps.json /User
 Open psql:
 
 ```bash
-docker exec -it supplygraph-postgres psql -U supplygraph -d supplygraph
+docker exec -it reporadar-postgres psql -U reporadar -d reporadar
 ```
 
 Useful checks:
@@ -330,10 +330,10 @@ LIMIT 20;
 Set the env var before `go run ./cmd/api`:
 
 ```bash
-export DATABASE_URL="postgres://supplygraph:supplygraph@localhost:5433/supplygraph?sslmode=disable"
+export DATABASE_URL="postgres://reporadar:reporadar@localhost:5433/reporadar?sslmode=disable"
 ```
 
-### `role "supplygraph" does not exist`
+### `role "reporadar" does not exist`
 
 You are likely pointing at the wrong Postgres instance or wrong host port. Check:
 
@@ -383,7 +383,7 @@ docker-compose.yml   Local Postgres
 
 ## Final Notes
 
-SupplyGraph is now in a good demo-ready state:
+RepoRadar is now in a good demo-ready state:
 
 - public repo URL in
 - automated scan pipeline

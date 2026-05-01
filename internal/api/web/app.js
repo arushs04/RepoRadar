@@ -392,7 +392,7 @@ function appendChatMessage(role, content) {
   const message = document.createElement("div");
   message.className = `chat-message ${role}`;
   message.innerHTML = `
-    <span class="chat-role">${role === "user" ? "You" : "SupplyGraph AI"}</span>
+    <span class="chat-role">${role === "user" ? "You" : "RepoRadar AI"}</span>
     <div class="chat-body">${formatChatContent(content)}</div>
   `;
   elements.chatMessages.appendChild(message);

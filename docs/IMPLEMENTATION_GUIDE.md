@@ -1,8 +1,8 @@
-# SupplyGraph Implementation Guide
+# RepoRadar Implementation Guide
 
 ## 1. Purpose
 
-This document explains the current SupplyGraph implementation in code terms, not just feature terms. It is meant to be read alongside the repository and should help you answer:
+This document explains the current RepoRadar implementation in code terms, not just feature terms. It is meant to be read alongside the repository and should help you answer:
 
 - what the system does today
 - how data moves through the codebase
@@ -596,7 +596,7 @@ If moving to MCP now, the best path is:
 
 ## 17. Final State of the Current Milestone
 
-At the end of the current implementation phase, SupplyGraph is a Go/Postgres backend that:
+At the end of the current implementation phase, RepoRadar is a Go/Postgres backend that:
 
 - ingests Syft JSON
 - normalizes package inventory

@@ -6,8 +6,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"supplygraph/internal/db"
-	"supplygraph/internal/mcpserver"
+	"reporadar/internal/db"
+	"reporadar/internal/mcpserver"
 )
 
 func main() {
@@ -20,7 +20,7 @@ func main() {
 	repo := db.NewRepository(database)
 	server := mcpserver.New(repo).MCP()
 
-	log.Printf("starting supplygraph mcp server on stdio")
+	log.Printf("starting reporadar mcp server on stdio")
 	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		log.Fatalf("run mcp server: %v", err)
 	}

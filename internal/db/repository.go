@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"supplygraph/internal/model"
+	"reporadar/internal/model"
 )
 
 type Repository struct {

@@ -38,7 +38,7 @@ func ResolvePublicRepo(ctx context.Context, client *http.Client, rawURL string) 
 		return RepoInfo{}, fmt.Errorf("build github repo request: %w", err)
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "supplygraph/0.1")
+	req.Header.Set("User-Agent", "reporadar/0.1")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -84,7 +84,7 @@ func DownloadAndExtractDefaultBranch(ctx context.Context, client *http.Client, r
 	if err != nil {
 		return "", fmt.Errorf("build github tarball request: %w", err)
 	}
-	req.Header.Set("User-Agent", "supplygraph/0.1")
+	req.Header.Set("User-Agent", "reporadar/0.1")
 
 	resp, err := client.Do(req)
 	if err != nil {

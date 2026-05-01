@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"supplygraph/internal/ai"
-	"supplygraph/internal/db"
-	"supplygraph/internal/model"
-	"supplygraph/internal/scanjobs"
+	"reporadar/internal/ai"
+	"reporadar/internal/db"
+	"reporadar/internal/model"
+	"reporadar/internal/scanjobs"
 )
 
 //go:embed web/*

@@ -1,4 +1,4 @@
-module supplygraph
+module reporadar
 
 go 1.25.0
 

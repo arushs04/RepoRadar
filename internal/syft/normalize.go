@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"supplygraph/internal/model"
+	"reporadar/internal/model"
 )
 
 // This file contains the function to normalize a Syft artifact into our internal model representation, decides whether it can be normalized.

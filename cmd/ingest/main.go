@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"supplygraph/internal/db"
-	"supplygraph/internal/ingest"
-	"supplygraph/internal/model"
-	"supplygraph/internal/syft"
+	"reporadar/internal/db"
+	"reporadar/internal/ingest"
+	"reporadar/internal/model"
+	"reporadar/internal/syft"
 )
 
 func main() {

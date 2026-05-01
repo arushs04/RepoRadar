@@ -2,11 +2,11 @@ version: "3.9"
 services:
   postgres:
     image: postgres:16
-    container_name: supplygraph-postgres
+    container_name: reporadar-postgres
     environment:
-      POSTGRES_DB: supplygraph
-      POSTGRES_USER: supplygraph
-      POSTGRES_PASSWORD: supplygraph
+      POSTGRES_DB: reporadar
+      POSTGRES_USER: reporadar
+      POSTGRES_PASSWORD: reporadar
     ports:
       - "5433:5432"
     volumes:

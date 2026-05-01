@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net/http"
 
-	"supplygraph/internal/db"
-	"supplygraph/internal/model"
-	"supplygraph/internal/osv"
-	"supplygraph/internal/severity"
-	"supplygraph/internal/syft"
+	"reporadar/internal/db"
+	"reporadar/internal/model"
+	"reporadar/internal/osv"
+	"reporadar/internal/severity"
+	"reporadar/internal/syft"
 )
 
 type InventoryResult struct {

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"supplygraph/internal/db"
-	"supplygraph/internal/model"
-	"supplygraph/internal/ollama"
+	"reporadar/internal/db"
+	"reporadar/internal/model"
+	"reporadar/internal/ollama"
 )
 
 type Service struct {
@@ -50,7 +50,7 @@ func (s *Service) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, err
 	messages := []ollama.Message{
 		{
 			Role: "system",
-			Content: "You are SupplyGraph Analyst. Answer only from the provided scan context. " +
+			Content: "You are RepoRadar Analyst. Answer only from the provided scan context. " +
 				"If the user asks for something not present in the context, say that clearly. " +
 				"Be concise, concrete, and prioritize remediation order when relevant.",
 		},
@@ -110,7 +110,7 @@ func (s *Service) buildContext(ctx context.Context, assetID, scanID string) (str
 	}
 
 	var b strings.Builder
-	b.WriteString("SupplyGraph scan context\n")
+	b.WriteString("RepoRadar scan context\n")
 	b.WriteString(fmt.Sprintf("scan_id: %s\n", scanID))
 	b.WriteString(fmt.Sprintf("scan_total_findings: %d\n", scanSummary.TotalFindings))
 	b.WriteString(fmt.Sprintf("scan_unique_vulnerabilities: %d\n", scanSummary.UniqueVulnerabilities))
