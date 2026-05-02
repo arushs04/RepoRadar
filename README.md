@@ -158,14 +158,29 @@ The embedded UI supports:
 
 ## Demo Videos
 
-Three short demo videos are included in the repo under `docs/demo/`:
+### Demo 1: End-to-end repo scan
 
-- [v1.mov](docs/demo/v1.mov)
-  Technical focus: end-to-end repository scan orchestration. This demo shows the UI submitting `POST /scan-jobs`, the backend resolving a public GitHub repo, downloading the tarball, running `syft`, persisting normalized inventory into PostgreSQL, enriching npm packages with OSV, and exposing the completed scan through the results view.
-- [v2.mov](docs/demo/v2.mov)
-  Technical focus: findings exploration through the API-backed UI. This demo shows severity and package filters, server-side sorting, and paginated findings retrieval driven by `GET /scans/:id/findings` with query params such as `severity_label`, `package`, `sort_by`, and `order`.
-- [v3.mov](docs/demo/v3.mov)
-  Technical focus: grounded local AI analysis. This demo shows the chat layer calling `POST /chat`, assembling context from the current asset summary, scan summary, and top findings, and sending that context to a local Ollama model for scan-specific answers rather than generic LLM output.
+Technical focus: repository scan orchestration. This demo shows the UI submitting `POST /scan-jobs`, the backend resolving a public GitHub repo, downloading the tarball, running `syft`, persisting normalized inventory into PostgreSQL, enriching npm packages with OSV, and exposing the completed scan through the results view.
+
+<video src="https://raw.githubusercontent.com/arushs04/RepoRadar/main/docs/demo/v1.mp4" controls width="100%"></video>
+
+Fallback file: [v1.mp4](docs/demo/v1.mp4)
+
+### Demo 2: API-backed findings exploration
+
+Technical focus: findings exploration through the API-backed UI. This demo shows severity and package filters, server-side sorting, and paginated findings retrieval driven by `GET /scans/:id/findings` with query params such as `severity_label`, `package`, `sort_by`, and `order`.
+
+<video src="https://raw.githubusercontent.com/arushs04/RepoRadar/main/docs/demo/v2.mp4" controls width="100%"></video>
+
+Fallback file: [v2.mp4](docs/demo/v2.mp4)
+
+### Demo 3: Grounded local AI chat
+
+Technical focus: grounded local AI analysis. This demo shows the chat layer calling `POST /chat`, assembling context from the current asset summary, scan summary, and top findings, and sending that context to a local Ollama model for scan-specific answers rather than generic LLM output.
+
+<video src="https://raw.githubusercontent.com/arushs04/RepoRadar/main/docs/demo/v3.mp4" controls width="100%"></video>
+
+Fallback file: [v3.mp4](docs/demo/v3.mp4)
 
 ## REST API
 
